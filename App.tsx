@@ -1,6 +1,6 @@
 import { StatusBar } from 'expo-status-bar';
 import { View, StyleSheet, TouchableWithoutFeedback, Text } from 'react-native';
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react"; // añadir useRef
 import Header from './components/header'
 import MainBar from './components/mainBar'
 import MenuUbicacion from './components/menuUbicacion'
@@ -20,6 +20,7 @@ export default function App() {
   const [menuUsuarioVisible, setMenuUsuarioVisible] = useState(false);
   const [usuarioScreen, setUsuarioScreen] = useState("menu");
   const [user, setUser] = useState(null); // <- estado de sesión
+  const lastDragAt = useRef(0); // añadir useRef para registrar el tiempo del último drag
 
   const API_URL = "http://localhost:3000"; // tu backend
 
@@ -38,7 +39,17 @@ export default function App() {
   }, []);
 
   const toggleMenu = () => setMenuVisible(!menuVisible);
-  const closeMenu = () => setMenuVisible(false);
+
+  // función que marca el tiempo del último drag
+  const handleMenuDragEnd = () => {
+    lastDragAt.current = Date.now();
+  };
+
+  const closeMenu = () => {
+    // si el usuario acaba de arrastrar, ignoramos el tap que podría cerrar inmediatamente
+    if (Date.now() - lastDragAt.current < 500) return;
+    setMenuVisible(false);
+  };
 
   const openCarrito = () => {
     setFavoritosVisible(false);
@@ -74,6 +85,7 @@ export default function App() {
   };
 
   const closeMenuUsuario = () => {
+    if (Date.now() - lastDragAt.current < 500) return;
     setMenuUsuarioVisible(false);
     setUsuarioScreen("menu");
   };
@@ -133,16 +145,14 @@ export default function App() {
       )}
 
       {menuVisible && (
-        <TouchableWithoutFeedback onPress={closeMenu}>
-          <View style={styles.overlayContainer}>
+        <View style={styles.overlayContainer}>
+          <TouchableWithoutFeedback onPress={closeMenu}>
             <View style={styles.overlay} />
-            <TouchableWithoutFeedback>
-              <View style={styles.menuUbiContainer}>
-                <MenuUbicacion />
-              </View>
-            </TouchableWithoutFeedback>
+          </TouchableWithoutFeedback>
+          <View style={styles.menuUbiContainer}>
+            <MenuUbicacion onClose={closeMenu} onDragEnd={handleMenuDragEnd} />
           </View>
-        </TouchableWithoutFeedback>
+        </View>
       )}
 
       {carritoVisible && (
@@ -175,31 +185,31 @@ export default function App() {
       )}
 
       {menuUsuarioVisible && (
-        <TouchableWithoutFeedback onPress={closeMenuUsuario}>
-          <View style={styles.menuUsuarioOverlayContainer}>
+        <View style={styles.menuUsuarioOverlayContainer}>
+          <TouchableWithoutFeedback onPress={closeMenuUsuario}>
             <View style={styles.overlay} />
-            <TouchableWithoutFeedback>
-              <View style={styles.menuUsuarioContainer}>
-                {usuarioScreen === "menu" && (
-                  <MenuUsuario 
-                    onLogin={handleLogin} 
-                    onRegister={handleRegister} 
-                  />
-                )}
-                {usuarioScreen === "login" && (
-                  <Login 
-                    onRegister={handleRegister} 
-                    onClose={closeMenuUsuario} 
-                    onLoginSuccess={loginUser} // pasa la función de login
-                  />
-                )}
-                {usuarioScreen === "register" && (
-                  <Register onClose={closeMenuUsuario} />
-                )}
-              </View>
-            </TouchableWithoutFeedback>
+          </TouchableWithoutFeedback>
+          <View style={styles.menuUsuarioContainer}>
+            {usuarioScreen === "menu" && (
+              <MenuUsuario 
+                onLogin={handleLogin} 
+                onRegister={handleRegister} 
+                onClose={closeMenuUsuario}
+                onDragEnd={handleMenuDragEnd}
+              />
+            )}
+            {usuarioScreen === "login" && (
+              <Login 
+                onRegister={handleRegister} 
+                onClose={closeMenuUsuario} 
+                onLoginSuccess={loginUser}
+              />
+            )}
+            {usuarioScreen === "register" && (
+              <Register onClose={closeMenuUsuario} />
+            )}
           </View>
-        </TouchableWithoutFeedback>
+        </View>
       )}
 
       <View style={styles.mainBarContainer}>
@@ -231,7 +241,13 @@ const styles = StyleSheet.create({
   },
   menuUbiContainer: {
     width: "100%",
+    height: "100%",
+    justifyContent: "flex-end",
+    backgroundColor: "transparent",
     zIndex: 11,
+    position: "absolute",
+    bottom: 0,
+    left: 0,
   },
   carritoOverlayContainer: {
     position: "absolute",
@@ -271,9 +287,8 @@ const styles = StyleSheet.create({
     left: 0,
     width: "100%",
     height: "100%",
-    zIndex: 29, // menor que el mainBar
+    zIndex: 29,
     justifyContent: "flex-end",
-    borderTopWidth: 0, // Set to 0 or your desired value
   },
   menuUsuarioContainer: {
     width: "100%",
@@ -291,6 +306,6 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     width: "100%",
-    zIndex: 30, // SIEMPRE visible, por encima de overlays pero debajo del carrito
+    zIndex: 1000,
   },
 });
